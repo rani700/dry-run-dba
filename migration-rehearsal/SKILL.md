@@ -10,26 +10,31 @@ been rehearsed on a temporary branch and a human has approved it.
 
 ## Procedure
 
+Work in one folder: run `mkdir -p /tmp/rehearsal` first and use the absolute paths
+`/tmp/rehearsal/before.json`, `/tmp/rehearsal/after.json` and `/tmp/rehearsal/migration.sql`.
+Call `run_sql` as a normal tool call, not from a script.
+
 1. **Find the target.** Use `list_projects` to get the Neon project id and the database
    name (usually `neondb`). If there is more than one candidate, ask the user.
 
 2. **Fingerprint production.** Run the fingerprint query below with `run_sql` on the
-   default (production) branch. Write the `run_sql` result to `before.json` in the sandbox exactly as returned.
+   default (production) branch. Write the `run_sql` result to `/tmp/rehearsal/before.json` exactly as returned.
    Do not reshape it; `compare.py` understands Neon's format.
 
 3. **Rehearse.** Call `prepare_database_migration` with the migration SQL. Neon applies
    it to a temporary branch only and returns that branch's id and a migration id.
    - If it fails, stop and report the error. Say clearly that production was not
      touched, explain the cause (for example, NULLs blocking SET NOT NULL, with the
-     count), and propose a fixed migration.
+     count), and propose a fixed migration. If a temporary branch was created anyway,
+     delete it with `delete_branch`.
 
 4. **Fingerprint the rehearsal.** Run the same fingerprint query with `run_sql` on the
-   temporary branch. Write the result to `after.json` exactly as returned.
+   temporary branch. Write the result to `/tmp/rehearsal/after.json` exactly as returned.
 
-5. **Analyze in code.** Write the migration SQL to `migration.sql`, then run:
+5. **Analyze in code.** Write the migration SQL to `/tmp/rehearsal/migration.sql`, then run:
 
    ```bash
-   python3 /opt/tf/skills/migration-rehearsal/scripts/compare.py before.json after.json migration.sql
+   python3 /opt/tf/skills/migration-rehearsal/scripts/compare.py /tmp/rehearsal/before.json /tmp/rehearsal/after.json /tmp/rehearsal/migration.sql
    ```
 
    Use the script's findings and its final `VERDICT:` line. Do not compute diffs yourself.
@@ -43,8 +48,9 @@ been rehearsed on a temporary branch and a human has approved it.
      lost), say "rollback cannot restore the data" and treat the migration as irreversible.
 
 7. **Decide.**
-   - **BLOCK**: do not call `complete_database_migration`. Explain the problem with the
-     real numbers, propose a safer migration, and offer to rehearse it.
+   - **BLOCK**: do not apply the migration. Explain the problem with the real numbers,
+     propose a safer migration, and offer to rehearse it. Then clean up: call `delete_branch`
+     on the temporary branch from step 3 (never on any other branch). This pauses for approval.
    - **SAFE / REVIEW**: first show the full risk card to the user, then call
      `complete_database_migration` with the migration id. The harness pauses for human
      approval here, and the approver must be able to see the risk card when deciding.
