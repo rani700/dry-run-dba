@@ -14,8 +14,8 @@ been rehearsed on a temporary branch and a human has approved it.
    name (usually `neondb`). If there is more than one candidate, ask the user.
 
 2. **Fingerprint production.** Run the fingerprint query below with `run_sql` on the
-   default (production) branch. It returns a single JSON value. Write that JSON (an array of row
-   objects) to `before.json` in the sandbox.
+   default (production) branch. Write the `run_sql` result to `before.json` in the sandbox exactly as returned.
+   Do not reshape it; `compare.py` understands Neon's format.
 
 3. **Rehearse.** Call `prepare_database_migration` with the migration SQL. Neon applies
    it to a temporary branch only and returns that branch's id and a migration id.
@@ -24,12 +24,12 @@ been rehearsed on a temporary branch and a human has approved it.
      count), and propose a fixed migration.
 
 4. **Fingerprint the rehearsal.** Run the same fingerprint query with `run_sql` on the
-   temporary branch. Write it to `after.json`.
+   temporary branch. Write the result to `after.json` exactly as returned.
 
 5. **Analyze in code.** Write the migration SQL to `migration.sql`, then run:
 
    ```bash
-   python3 /opt/tfy/skills/migration-rehearsal/scripts/compare.py before.json after.json migration.sql
+   python3 /opt/tf/skills/migration-rehearsal/scripts/compare.py before.json after.json migration.sql
    ```
 
    Use the script's findings and its final `VERDICT:` line. Do not compute diffs yourself.
@@ -45,8 +45,9 @@ been rehearsed on a temporary branch and a human has approved it.
 7. **Decide.**
    - **BLOCK**: do not call `complete_database_migration`. Explain the problem with the
      real numbers, propose a safer migration, and offer to rehearse it.
-   - **SAFE / REVIEW**: call `complete_database_migration` with the migration id. The
-     harness pauses for human approval here. That pause is intentional.
+   - **SAFE / REVIEW**: first show the full risk card to the user, then call
+     `complete_database_migration` with the migration id. The harness pauses for human
+     approval here, and the approver must be able to see the risk card when deciding.
 
 8. **Verify.** After the migration is applied, fingerprint the production branch again, compare it with
    `after.json`, and confirm that production now matches the rehearsal.

@@ -50,9 +50,14 @@ def lint(sql):
 def load(path):
     with open(path) as f:
         data = json.load(f)
+    # Neon's run_sql returns [{"fingerprint": [...]}]; unwrap that single row.
+    if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict) and "fingerprint" in data[0]:
+        data = data[0]["fingerprint"]
     # Accept a bare array, or an object wrapping one (e.g. {"rows": [...]}).
     if isinstance(data, dict):
-        data = next((v for v in data.values() if isinstance(v, list)), [])
+        data = data.get("fingerprint") or next((v for v in data.values() if isinstance(v, list)), [])
+    if isinstance(data, str):
+        data = json.loads(data)
     rows = {}
     for r in data:
         rows[(r["table_name"], r["column_name"])] = r
